@@ -6,6 +6,7 @@ Run using ../.venv/Scripts/python.exe; paths are resolved from this file.
 import argparse
 import gc
 import hashlib
+import inspect
 import json
 import os
 from pathlib import Path
@@ -24,6 +25,17 @@ import numpy as np
 import torch
 from configs import get_config
 from models import InterGenSpatialControlNet
+
+
+def load_torch(path, map_location="cpu"):
+    """weights_only on torch>=2.0; plain load on the paper's torch 1.13."""
+    if "weights_only" in inspect.signature(torch.load).parameters:
+        return torch.load(path, map_location=map_location, weights_only=True)
+    return torch.load(path, map_location=map_location)
+
+
+def strip_prefix(text, prefix):
+    return text[len(prefix):] if prefix and text.startswith(prefix) else text
 
 
 def digest(path):
@@ -70,8 +82,8 @@ def main():
     model = InterGenSpatialControlNet(cfg)
     if args.stage == "multi":
         parent = out / "single_random_init.ckpt"
-        ckpt = torch.load(parent, map_location="cpu", weights_only=True)
-        state = {k.removeprefix("model."): v for k, v in ckpt["state_dict"].items()}
+        ckpt = load_torch(parent, map_location="cpu")
+        state = {strip_prefix(k, "model."): v for k, v in ckpt["state_dict"].items()}
         result = model.load_state_dict(state, strict=False)  # upstream copies single branch to control branch
         assert not result.unexpected_keys, result
         assert all(k.startswith("decoder.net.zero_linear.") for k in result.missing_keys), result
@@ -90,8 +102,8 @@ def main():
     metadata["checkpoint_sha256"] = digest(checkpoint)
     print("Saved untrained checkpoint", checkpoint, flush=True)
     # Verify a saved full multi checkpoint without invoking upstream's stage-transfer override.
-    saved = torch.load(checkpoint, map_location="cpu", weights_only=True)
-    torch.nn.Module.load_state_dict(model, {k.removeprefix("model."): v for k, v in saved["state_dict"].items()}, strict=True)
+    saved = load_torch(checkpoint, map_location="cpu")
+    torch.nn.Module.load_state_dict(model, {strip_prefix(k, "model."): v for k, v in saved["state_dict"].items()}, strict=True)
     del saved
     gc.collect()
     metadata["strict_checkpoint_reload"] = True

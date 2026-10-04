@@ -29,6 +29,7 @@ INVOCATION_CWD = Path.cwd()
 from small_scale_trial import (
     ROOT, seed, get_config, SingleHumanDataset,
     InterGenSpatialControlNet, CosineWarmupScheduler, builtin_metadata, evaluate,
+    strip_prefix, strip_suffix, load_torch,
 )
 
 # Fixed 4-train/4-val 120-frame subset built by small_scale_trial.prepare(); reused as a
@@ -83,9 +84,9 @@ def build_dataset(cache):
     dataset = SingleHumanDataset(cfg)
     # Sort so the sample order (and therefore the deterministic epoch shuffle) is stable
     # across runs, matching the integrity check used by train_overnight.py.
-    dataset.data_list.sort(key=lambda x: (int(x["name"].removesuffix("_swap")), bool(x["swap"])))
+    dataset.data_list.sort(key=lambda x: (int(strip_suffix(x["name"], "_swap")), bool(x["swap"])))
     n = len(dataset)
-    ids = sorted({x["name"].removesuffix("_swap") for x in dataset.data_list}, key=int)
+    ids = sorted({strip_suffix(x["name"], "_swap") for x in dataset.data_list}, key=int)
     expected = json.loads((ROOT / "artifacts/local_data_policy.json").read_text(encoding="utf-8"))["eligible"]["train"]
     assert len(ids) == expected and n == 2 * expected, (len(ids), n, expected)
     assert dataset.max_gt_length == 300
@@ -93,7 +94,7 @@ def build_dataset(cache):
 
 
 def load_payload(path):
-    return torch.load(path, map_location="cpu", weights_only=True)
+    return load_torch(path, map_location="cpu")
 
 
 def main(args):
@@ -162,7 +163,7 @@ def main(args):
         if resume_file.exists():
             raise SystemExit(f"{resume_file} already exists; use --resume or a new --output-dir")
         saved = load_payload(source)
-    model.load_state_dict({k.removeprefix("model."): v for k, v in saved["state_dict"].items()}, strict=True)
+    model.load_state_dict({strip_prefix(k, "model."): v for k, v in saved["state_dict"].items()}, strict=True)
 
     model.cuda()
     assert not any(p.requires_grad for p in model.clipTransEncoder.parameters())

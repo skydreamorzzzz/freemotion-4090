@@ -4,6 +4,7 @@ This diagnoses memory, optimization and early samples; it is not a paper benchma
 """
 import argparse
 import gc
+import inspect
 import json
 import os
 from pathlib import Path
@@ -34,6 +35,23 @@ def seed(value):
     random.seed(value)
     np.random.seed(value)
     torch.manual_seed(value)
+
+
+# Version-portable helpers so the same scripts run on both the local Python 3.12 /
+# torch 2.11 env and the paper's Python 3.8 / torch 1.13 env.
+def strip_prefix(text, prefix):
+    return text[len(prefix):] if prefix and text.startswith(prefix) else text
+
+
+def strip_suffix(text, suffix):
+    return text[:-len(suffix)] if suffix and text.endswith(suffix) else text
+
+
+def load_torch(path, map_location="cpu"):
+    """torch.load with weights_only when the running torch supports it (>=2.0)."""
+    if "weights_only" in inspect.signature(torch.load).parameters:
+        return torch.load(path, map_location=map_location, weights_only=True)
+    return torch.load(path, map_location=map_location)
 
 
 def write_json(path, value):
@@ -204,8 +222,8 @@ def run(stage, steps, unfreeze_text_adapter=False):
     cfg = get_config("configs/model_single.yaml" if stage == "single" else "configs/model_inter.yaml")
     model = InterGenSpatialControlNet(cfg)
     source = ROOT / "artifacts/random_init/single_random_init.ckpt" if stage == "single" else OUT / "single_trial.ckpt"
-    ckpt = torch.load(source,map_location="cpu",weights_only=True)
-    result = model.load_state_dict({k.removeprefix("model."):v for k,v in ckpt["state_dict"].items()}, strict=stage=="single")
+    ckpt = load_torch(source, map_location="cpu")
+    result = model.load_state_dict({strip_prefix(k,"model."):v for k,v in ckpt["state_dict"].items()}, strict=stage=="single")
     if stage == "multi":
         assert not result.unexpected_keys and all(k.startswith("decoder.net.zero_linear.") for k in result.missing_keys)
     del ckpt
