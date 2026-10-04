@@ -1,5 +1,7 @@
 # 4090 24GB：Stage-1 单人全量训练
 
+> 历史方案，尚未据当前远程机器验证。用户已明确要求保留可用的 py38 + torch1.13.1+cu117；本文的旧安装建议不再适用。请先执行 [远程只读审计](12_remote_environment_audit.md)，不要根据本文估算修改环境或直接开训。
+
 面向线上单卡 4090（24GB）的新入口 `scripts/train_full_single_4090.py`。它保留上游模型、损失、数据类与单人流程不变，只替换训练循环与显存/速度相关的配置。原来的 `scripts/train_overnight.py`（5060 8GB、microbatch=1、累积16、12 小时预算）保持原样，作为低显存记录，不再用于正式训练。
 
 本轮只做 Stage-1 单人（用户确认）。交互阶段未改，也不在本文范围内。
@@ -95,4 +97,4 @@ git clone https://github.com/skydreamorzzzz/FreeMotion-Codes.git freemotion-4090
 
 ## 环境
 
-线上机建议独立 Python 3.12 venv + `requirements-local.txt`（torch 2.11.0+cu128 覆盖 4090 的 sm_89）。需要的数据/资产：`FreeMotion/data/`（含 `motions_processed`、`split`、`annots`、`separate_annots`）、`artifacts/random_init/single_random_init.ckpt`、`configs/datasets_single_local.yaml`；固定验证子集 `artifacts/small_scale_8gb/subset.npz` 缺失时自动跳过 val 诊断。Linux 上 `num_workers>0` 用 fork，CACHE 的动作集为写时复制共享；Windows 上是 spawn，会按 worker 复制缓存，显存/内存更紧时用 `--num-workers 0` 或 `--no-cache`。
+原先建议升级 Python3.12/torch2.11 的方案已撤回：当前远程 py38 + torch1.13.1+cu117 已由用户验证GPU矩阵乘可用，先保留，不能根据显卡型号或驱动CUDA版本升级。依赖及数据准备以当前官方baseline审计结果为准，本节不提供安装命令。
