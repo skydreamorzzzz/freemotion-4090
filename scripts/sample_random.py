@@ -14,6 +14,7 @@ os.chdir(REPO)
 from configs import get_config
 from models import InterGenSpatialControlNet
 from utils.utils import MotionNormalizer
+from small_scale_trial import load_torch, strip_prefix
 
 
 def main():
@@ -32,8 +33,8 @@ def main():
     cfg = get_config("configs/model_single.yaml" if stage == "single" else "configs/model_inter.yaml")
     model = InterGenSpatialControlNet(cfg)
     checkpoint = ROOT / "artifacts/random_init" / f"{stage}_random_init.ckpt"
-    data = torch.load(checkpoint,map_location="cpu",weights_only=True)
-    torch.nn.Module.load_state_dict(model,{k.removeprefix("model."):v for k,v in data["state_dict"].items()},strict=True)
+    data = load_torch(checkpoint,map_location="cpu")
+    torch.nn.Module.load_state_dict(model,{strip_prefix(k,"model."):v for k,v in data["state_dict"].items()},strict=True)
     del data
     model.cuda().eval()
     generated = []

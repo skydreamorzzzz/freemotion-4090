@@ -13,7 +13,7 @@ import time
 import traceback
 import numpy as np
 import torch
-from small_scale_trial import ROOT, REPO, seed, get_config, SingleHumanDataset, InterGenSpatialControlNet, CosineWarmupScheduler, builtin_metadata, evaluate
+from small_scale_trial import ROOT, REPO, seed, get_config, SingleHumanDataset, InterGenSpatialControlNet, CosineWarmupScheduler, builtin_metadata, evaluate, load_torch, strip_prefix, strip_suffix
 
 
 def atomic_json(path,value):
@@ -45,9 +45,9 @@ def main(args):
     seed(args.seed)
     cfg=get_config(str(ROOT/'configs/datasets_single_local.yaml')).interhuman
     dataset=SingleHumanDataset(cfg)
-    dataset.data_list.sort(key=lambda x:(int(x['name'].removesuffix('_swap')),bool(x['swap'])))
+    dataset.data_list.sort(key=lambda x:(int(strip_suffix(x['name'],'_swap')),bool(x['swap'])))
     n=len(dataset)
-    ids=sorted({x['name'].removesuffix('_swap') for x in dataset.data_list},key=int)
+    ids=sorted({strip_suffix(x['name'],'_swap') for x in dataset.data_list},key=int)
     expected=json.loads((ROOT/'artifacts/local_data_policy.json').read_text(encoding='utf-8'))['eligible']['train']
     assert len(ids)==expected and n==2*expected
     assert dataset.max_gt_length==300
@@ -59,8 +59,8 @@ def main(args):
         'gradient_clip':0.5,'warmup_epochs':10,'cosine_epochs':2500,'seed':args.seed,
         'source':str(ROOT/'artifacts/random_init/single_random_init.ckpt')}
     model=InterGenSpatialControlNet(get_config('configs/model_single.yaml'))
-    saved=torch.load(out/'latest.ckpt' if args.resume else protocol['source'],map_location='cpu',weights_only=True)
-    model.load_state_dict({k.removeprefix('model.'):v for k,v in saved['state_dict'].items()},strict=True)
+    saved=load_torch(out/'latest.ckpt' if args.resume else protocol['source'],map_location='cpu')
+    model.load_state_dict({strip_prefix(k,'model.'):v for k,v in saved['state_dict'].items()},strict=True)
     model.cuda().train()
     assert not any(p.requires_grad for p in model.clipTransEncoder.parameters())
     params=[p for p in model.parameters() if p.requires_grad]

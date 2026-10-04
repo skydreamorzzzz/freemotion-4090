@@ -18,6 +18,7 @@ from configs import get_config
 from datasets.interhuman import SingleHumanDataset
 from models import InterGenSpatialControlNet
 from models.utils import CosineWarmupScheduler
+from small_scale_trial import load_torch, strip_prefix
 
 
 def main():
@@ -38,8 +39,8 @@ def main():
     loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
     cfg = get_config("configs/model_single.yaml")
     model = InterGenSpatialControlNet(cfg)
-    ckpt = torch.load(ROOT / "artifacts/random_init/single_random_init.ckpt", map_location="cpu", weights_only=True)
-    model.load_state_dict({k.removeprefix("model."):v for k,v in ckpt["state_dict"].items()}, strict=True)
+    ckpt = load_torch(ROOT / "artifacts/random_init/single_random_init.ckpt", map_location="cpu")
+    model.load_state_dict({strip_prefix(k,"model."):v for k,v in ckpt["state_dict"].items()}, strict=True)
     del ckpt
     gc.collect()
     model.cuda().train()

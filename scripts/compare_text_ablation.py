@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from pathlib import Path
 from render_small_scale import animate
+from small_scale_trial import load_torch
 
 ROOT=Path(__file__).resolve().parents[1]
 a=ROOT/'artifacts/single_2000_8gb'
@@ -25,11 +26,11 @@ for split in ['train','val']:
                     [f'{split}: real reference','Frozen adapter: 2000','Trainable adapter: 2000'],
                     b/f'single_{split}_adapter_comparison.gif')
 prefixes=('model.clipTransEncoder.','model.clip_ln.','model.clip_transformer.','model.token_embedding.','model.ln_final.','model.positional_embedding')
-c=torch.load(ROOT/'artifacts/random_init/single_random_init.ckpt',map_location='cpu',weights_only=True)
+c=load_torch(ROOT/'artifacts/random_init/single_random_init.ckpt',map_location='cpu')
 initial={k:v.clone() for k,v in c['state_dict'].items() if k.startswith(prefixes)}
 del c
 gc.collect()
-c=torch.load(b/'single_trial.ckpt',map_location='cpu',weights_only=True)
+c=load_torch(b/'single_trial.ckpt',map_location='cpu')
 changed=[k for k,v in initial.items() if not torch.equal(v,c['state_dict'][k])]
 assert changed and all(k.startswith(('model.clipTransEncoder.','model.clip_ln.')) for k in changed)
 summary={'same_subset':True,'same_steps_order_lr':True,'same_before_samples':True,

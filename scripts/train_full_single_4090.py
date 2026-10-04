@@ -87,9 +87,15 @@ def build_dataset(cache):
     dataset.data_list.sort(key=lambda x: (int(strip_suffix(x["name"], "_swap")), bool(x["swap"])))
     n = len(dataset)
     ids = sorted({strip_suffix(x["name"], "_swap") for x in dataset.data_list}, key=int)
-    expected = json.loads((ROOT / "artifacts/local_data_policy.json").read_text(encoding="utf-8"))["eligible"]["train"]
-    assert len(ids) == expected and n == 2 * expected, (len(ids), n, expected)
+    assert n == 2 * len(ids), (n, len(ids))  # one original + one mirror per train ID
     assert dataset.max_gt_length == 300
+    # artifacts/ is not in the repo, so only enforce the local 5629-ID pin when present.
+    policy = ROOT / "artifacts/local_data_policy.json"
+    if policy.exists():
+        expected = json.loads(policy.read_text(encoding="utf-8"))["eligible"]["train"]
+        assert len(ids) == expected, (len(ids), expected)
+    else:
+        print(f"note: {policy} absent; using {len(ids)} train IDs without the local policy pin", flush=True)
     return dataset, ids, n
 
 

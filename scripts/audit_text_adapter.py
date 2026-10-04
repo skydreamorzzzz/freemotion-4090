@@ -2,19 +2,19 @@
 import gc
 import json
 import torch
-from small_scale_trial import ROOT, get_config, InterGenSpatialControlNet, seed
+from small_scale_trial import ROOT, get_config, InterGenSpatialControlNet, seed, load_torch, strip_prefix
 
 torch.set_num_threads(4)
 prefixes=('model.clipTransEncoder.','model.clip_ln.')
-original=torch.load(ROOT/'artifacts/random_init/single_random_init.ckpt',map_location='cpu',weights_only=True)
+original=load_torch(ROOT/'artifacts/random_init/single_random_init.ckpt',map_location='cpu')
 initial={k:v.clone() for k,v in original['state_dict'].items() if k.startswith(prefixes)}
 del original
 gc.collect()
-trained=torch.load(ROOT/'artifacts/single_2000_8gb/single_trial.ckpt',map_location='cpu',weights_only=True)
+trained=load_torch(ROOT/'artifacts/single_2000_8gb/single_trial.ckpt',map_location='cpu')
 equal={k:torch.equal(v,trained['state_dict'][k]) for k,v in initial.items()}
 seed(20261003)
 model=InterGenSpatialControlNet(get_config('configs/model_single.yaml'))
-model.load_state_dict({k.removeprefix('model.'):v for k,v in trained['state_dict'].items()},strict=True)
+model.load_state_dict({strip_prefix(k,'model.'):v for k,v in trained['state_dict'].items()},strict=True)
 del trained
 gc.collect()
 prompts=['A person walks forward.','A person sits down.','A person jumps.']

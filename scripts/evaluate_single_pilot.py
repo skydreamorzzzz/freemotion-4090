@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 import numpy as np
 import torch
-from small_scale_trial import ROOT, REPO, seed, get_config, InterGenSpatialControlNet, MotionNormalizer
+from small_scale_trial import ROOT, REPO, seed, get_config, InterGenSpatialControlNet, MotionNormalizer, load_torch, strip_prefix
 from datasets.interhuman import InterHumanPipelineInferDataset
 from datasets.evaluator import EvaluatorModelWrapper
 from utils.metrics import calculate_activation_statistics, calculate_frechet_distance, euclidean_distance_matrix, calculate_top_k
@@ -23,7 +23,10 @@ def main(checkpoint, split, requested_samples=96):
     if (OUT/'report.json').exists():
         raise SystemExit('Completed report exists; preserve it')
     with checkpoint.open('rb') as stream:
-        checkpoint_hash=hashlib.file_digest(stream,'sha256').hexdigest()
+        digest=hashlib.sha256()
+        for block in iter(lambda: stream.read(8*1024*1024), b''):
+            digest.update(block)
+        checkpoint_hash=digest.hexdigest()
     run_config={'checkpoint_sha256':checkpoint_hash,'split':split,'seed':SEED,'requested_samples':requested_samples}
     config_path=OUT/'run_config.json'
     if config_path.exists():
@@ -51,8 +54,8 @@ def main(checkpoint, split, requested_samples=96):
         free,_=torch.cuda.mem_get_info()
         if free<5.5*1024**3: raise RuntimeError('Need 5.5 GiB free GPU memory')
         model=InterGenSpatialControlNet(get_config('configs/model_single.yaml'))
-        ckpt=torch.load(checkpoint,map_location='cpu',weights_only=True)
-        model.load_state_dict({k.removeprefix('model.'):v for k,v in ckpt['state_dict'].items()},strict=True)
+        ckpt=load_torch(checkpoint,map_location='cpu')
+        model.load_state_dict({strip_prefix(k,'model.'):v for k,v in ckpt['state_dict'].items()},strict=True)
         del ckpt
         model.cuda().eval()
         normalizer=MotionNormalizer()
