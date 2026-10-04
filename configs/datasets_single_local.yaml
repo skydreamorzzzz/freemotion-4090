@@ -1,0 +1,7 @@
+interhuman:
+  NAME: singlehuman
+  DATA_ROOT: ./data
+  MOTION_REP: global
+  MODE: train
+  CACHE: False
+  SINGLE_TEXT_DESCRIPTION: True

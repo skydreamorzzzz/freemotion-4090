@@ -1,0 +1,9 @@
+.venv/
+downloads/
+artifacts/
+__pycache__/
+*.pyc
+
+# FreeMotion is a separate repo (github.com/skydreamorzzzz/FreeMotion-Codes);
+# clone it alongside this one, do not vendor it here.
+/FreeMotion/
